@@ -34,14 +34,14 @@ def sentiment_reader(src_filename, include_subtrees=True, dedup=False):
 
     Yields
     ------
-    pd.DataFrame with columns ['example_id', 'sentence', 'label']
+    pd.DataFrame with columns ['example_id', 'sentence', 'gold_label']
 
     """
     df = pd.read_csv(src_filename)
     if not include_subtrees:
         df = df[df.is_subtree == 0]
     if dedup:
-        df = df.groupby(['sentence', 'label']).apply(lambda x: x.iloc[0])
+        df = df.groupby(['sentence', 'gold_label']).apply(lambda x: x.iloc[0])
         df = df.reset_index(drop=True)
     return df
 
@@ -145,8 +145,8 @@ def build_dataset(dataframes, phi, vectorizer=None, vectorize=True):
 
     feat_dicts = list(df.sentence.apply(phi).values)
 
-    if 'label' in df.columns:
-        labels = list(df.label.values)
+    if 'gold_label' in df.columns:
+        labels = list(df.gold_label.values)
     else:
         labels = None
 
@@ -430,5 +430,5 @@ def build_rnn_dataset(dataframes, tokenizer=lambda s: s.split()):
     else:
         df = dataframes
     X = list(df.sentence.apply(tokenizer))
-    y = list(df.label.values)
+    y = list(df.gold_label.values)
     return X, y
