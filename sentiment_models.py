@@ -1,5 +1,6 @@
 from json import encoder
 import os
+from sqlalchemy import false
 import torch
 import torch.nn as nn
 import transformers
@@ -28,8 +29,8 @@ roberta_tokenizer = AutoTokenizer.from_pretrained(
     max_length=128,
     padding='max_length')
 
-# Modular sentiment classifier definition
 
+### Modular sentiment classifier definition ###
 
 class SentimentClassifierModel(nn.Module):
     def __init__(self, n_classes, encoder_module, pooling_module):
@@ -47,67 +48,8 @@ class SentimentClassifierModel(nn.Module):
         pooled = self.pooling_module(reps)
         return self.classifier_module(pooled)
 
-# Classifiers (follow the Scikit-Learn model API).
 
-
-class SentimentClassifierBase(TorchShallowNeuralClassifier):
-    def __init__(self, encoder_module=None, pooling_module=None, name=None, *args, **kwargs):
-        self.encoder_module = encoder_module
-        encoder_module.train()
-        self.pooling_module = pooling_module
-        self.name = name
-        super().__init__(*args, **kwargs)
-
-    def build_graph(self):
-        return SentimentClassifierModel(self.n_classes_, self.encoder_module, self.pooling_module).to(device)
-
-    def build_dataset(self, X, y=None):
-        """Dataset processing, e.g. tokenizing text."""
-        raise NotImplementedError
-
-    def __repr__(self):
-        return self.name
-
-
-class SentimentClassifierRNN(SentimentClassifierBase):
-    def build_dataset(self, X, y=None):
-        # TODO see build_dataset and _prepare_sequences in TorchRNNClassifier
-        X = [x.split() for x in X]
-        if y is None:
-            dataset = torch.utils.data.TensorDataset(X)
-        else:
-            self.classes_ = sorted(set(y))
-            self.n_classes_ = len(self.classes_)
-            class2index = dict(zip(self.classes_, range(self.n_classes_)))
-            y = [class2index[label] for label in y]
-            y = torch.tensor(y)
-            dataset = torch.utils.data.TensorDataset(X, y)
-        return dataset
-
-
-class SentimentClassifierRoberta(SentimentClassifierBase):
-    def build_dataset(self, X, y=None):
-        data = roberta_tokenizer.batch_encode_plus(
-            X,
-            max_length=None,
-            add_special_tokens=True,
-            padding='longest',
-            return_attention_mask=True)
-        indices = torch.tensor(data['input_ids'])
-        mask = torch.tensor(data['attention_mask'])
-        if y is None:
-            dataset = torch.utils.data.TensorDataset(indices, mask)
-        else:
-            self.classes_ = sorted(set(y))
-            self.n_classes_ = len(self.classes_)
-            class2index = dict(zip(self.classes_, range(self.n_classes_)))
-            y = [class2index[label] for label in y]
-            y = torch.tensor(y)
-            dataset = torch.utils.data.TensorDataset(indices, mask, y)
-        return dataset
-
-# Pooling layer definitions
-
+### Pooling layer definitions ###
 
 class PoolingModuleBase(nn.Module):
     def forward(self, reps):
@@ -141,7 +83,86 @@ class PoolingModuleTransformerAAN(PoolingModuleBase):
         return reps.last_hidden_state[:, 0, :]
 
 
-def build_untrained_classifier_models(X_train, transformer_hyperparams, lstm_hyperparams):
+### Classifiers (follow the Scikit-Learn model API) ###
+
+class SentimentClassifierBase(TorchShallowNeuralClassifier):
+    def __init__(self, encoder_module=None, pooling_module=None, name=None, *args, **kwargs):
+        self.encoder_module = encoder_module
+        encoder_module.train()
+        self.pooling_module = pooling_module
+        self.name = name
+        super().__init__(*args, **kwargs)
+
+    def build_graph(self):
+        return SentimentClassifierModel(self.n_classes_, self.encoder_module, self.pooling_module).to(device)
+
+    def build_dataset(self, X, y=None):
+        """Dataset processing, e.g. tokenizing text."""
+        raise NotImplementedError
+
+    def __repr__(self):
+        return self.name
+
+
+class SentimentClassifierLSTM(SentimentClassifierBase):
+    def build_dataset(self, X, y=None):
+        # TODO see build_dataset and _prepare_sequences in TorchRNNClassifier
+        X = [x.split() for x in X]
+        if y is None:
+            dataset = torch.utils.data.TensorDataset(X)
+        else:
+            self.classes_ = sorted(set(y))
+            self.n_classes_ = len(self.classes_)
+            class2index = dict(zip(self.classes_, range(self.n_classes_)))
+            y = [class2index[label] for label in y]
+            y = torch.tensor(y)
+            dataset = torch.utils.data.TensorDataset(X, y)
+        return dataset
+
+
+class SentimentClassifierTransformerBase(SentimentClassifierBase):
+    def build_dataset(self, X, y=None):
+        data = roberta_tokenizer.batch_encode_plus(
+            X,
+            max_length=None,
+            add_special_tokens=True,
+            padding='longest',
+            return_attention_mask=True)
+        indices = torch.tensor(data['input_ids'])
+        mask = torch.tensor(data['attention_mask'])
+        if y is None:
+            dataset = torch.utils.data.TensorDataset(indices, mask)
+        else:
+            self.classes_ = sorted(set(y))
+            self.n_classes_ = len(self.classes_)
+            class2index = dict(zip(self.classes_, range(self.n_classes_)))
+            y = [class2index[label] for label in y]
+            y = torch.tensor(y)
+            dataset = torch.utils.data.TensorDataset(indices, mask, y)
+        return dataset
+
+
+class SentimentClassifierRoberta(SentimentClassifierTransformerBase):
+    def __init__(self, use_aan, hyperparams):
+        encoder_module = AutoModel.from_pretrained(
+            'roberta-base', config=roberta_config)
+        pooling_module = PoolingModuleTransformerAAN(
+        ) if use_aan else PoolingModuleTransformerCLS()
+        name = 'sentiment_classifier_roberta_aan' if use_aan else 'sentiment_classifier_roberta_base'
+        super().__init__(encoder_module, pooling_module, name, **hyperparams)
+
+
+class SentimentClassifierDynasent(SentimentClassifierTransformerBase):
+    def __init__(self, use_aan, hyperparams):
+        encoder_module = AutoModel.from_pretrained(os.path.join(
+            'models', 'dynasent_model1.bin'), config=roberta_config)
+        pooling_module = PoolingModuleTransformerAAN(
+        ) if use_aan else PoolingModuleTransformerCLS()
+        name = 'sentiment_classifier_dynasent_aan' if use_aan else 'sentiment_classifier_dynasent_base'
+        super().__init__(encoder_module, pooling_module, name, **hyperparams)
+
+
+def todo_build_rnn(X_train, transformer_hyperparams, lstm_hyperparams):
     """Instantiate our different models."""
     vocab = utils.get_vocab(X_train, mincount=2)
 
@@ -154,37 +175,3 @@ def build_untrained_classifier_models(X_train, transformer_hyperparams, lstm_hyp
     #     hidden_dim=self.hidden_dim,
     #     bidirectional=self.bidirectional,
     #     freeze_embedding=self.freeze_embedding)
-    encoder_roberta = AutoModel.from_pretrained(
-        'roberta-base', config=roberta_config)
-    encoder_dynasent = AutoModel.from_pretrained(os.path.join(
-        'models', 'dynasent_model1.bin'), config=roberta_config)
-
-    pooler_lstm_last = PoolingModuleRNNLast()
-    pooler_transformer_cls = PoolingModuleTransformerCLS()
-    pooler_lstm_aan = PoolingModuleRNNAAN()
-    pooler_transformer_aan = PoolingModuleTransformerAAN()
-
-
-    sentiment_classifier_lstm_base = None # SentimentClassifierRNN(
-        # encoder_lstm.detach().clone(), pooler_lstm_last, kwargs=lstm_hyperparams)
-    sentiment_classifier_roberta_base = SentimentClassifierRoberta(
-        AutoModel.from_pretrained('roberta-base', config=roberta_config),
-        pooler_transformer_cls, 'sentiment_classifier_roberta_base', **transformer_hyperparams)
-    sentiment_classifier_dynasent_base = SentimentClassifierRoberta(
-        AutoModel.from_pretrained(os.path.join('models', 'dynasent_model1.bin'), config=roberta_config),
-        pooler_transformer_cls, 'sentiment_classifier_dynasent_base', **transformer_hyperparams)
-    sentiment_classifier_lstm_aan = None # SentimentClassifierRNN(
-        # encoder_lstm.detach().clone(), pooler_lstm_aan, kwargs=lstm_hyperparams)
-    sentiment_classifier_roberta_aan = SentimentClassifierRoberta(
-        AutoModel.from_pretrained('roberta-base', config=roberta_config),
-        pooler_transformer_aan, 'sentiment_classifier_roberta_aan', **transformer_hyperparams)
-    sentiment_classifier_dynasent_aan = SentimentClassifierRoberta(
-        AutoModel.from_pretrained(os.path.join('models', 'dynasent_model1.bin'), config=roberta_config),
-        pooler_transformer_aan, 'sentiment_classifier_dynasent_aan', **transformer_hyperparams)
-        
-    return (sentiment_classifier_lstm_base,
-        sentiment_classifier_roberta_base,
-        sentiment_classifier_dynasent_base,
-        sentiment_classifier_lstm_aan,
-        sentiment_classifier_roberta_aan,
-        sentiment_classifier_dynasent_aan)
