@@ -51,7 +51,7 @@ class SentimentClassifierModel(nn.Module):
 
 
 class SentimentClassifierBase(TorchShallowNeuralClassifier):
-    def __init__(self, encoder_module, pooling_module, name, *args, **kwargs):
+    def __init__(self, encoder_module=None, pooling_module=None, name=None, *args, **kwargs):
         self.encoder_module = encoder_module
         encoder_module.train()
         self.pooling_module = pooling_module
@@ -137,7 +137,8 @@ class PoolingModuleTransformerAAN(PoolingModuleBase):
     def forward(self, reps):
         """Uses a concept-based abstraction-aggregation network over all transformer output reps."""
         # TODO(atharva): Implement AAN layers
-        raise NotImplementedError
+        # raise NotImplementedError
+        return reps.last_hidden_state[:, 0, :]
 
 
 def build_untrained_classifier_models(X_train, transformer_hyperparams, lstm_hyperparams):
@@ -167,15 +168,19 @@ def build_untrained_classifier_models(X_train, transformer_hyperparams, lstm_hyp
     sentiment_classifier_lstm_base = None # SentimentClassifierRNN(
         # encoder_lstm.detach().clone(), pooler_lstm_last, kwargs=lstm_hyperparams)
     sentiment_classifier_roberta_base = SentimentClassifierRoberta(
-        encoder_roberta.detach().clone(), pooler_transformer_cls, 'sentiment_classifier_roberta_base', **transformer_hyperparams)
+        AutoModel.from_pretrained('roberta-base', config=roberta_config),
+        pooler_transformer_cls, 'sentiment_classifier_roberta_base', **transformer_hyperparams)
     sentiment_classifier_dynasent_base = SentimentClassifierRoberta(
-        encoder_dynasent.detach().clone(), pooler_transformer_cls, 'sentiment_classifier_dynasent_base', **transformer_hyperparams)
+        AutoModel.from_pretrained(os.path.join('models', 'dynasent_model1.bin'), config=roberta_config),
+        pooler_transformer_cls, 'sentiment_classifier_dynasent_base', **transformer_hyperparams)
     sentiment_classifier_lstm_aan = None # SentimentClassifierRNN(
         # encoder_lstm.detach().clone(), pooler_lstm_aan, kwargs=lstm_hyperparams)
     sentiment_classifier_roberta_aan = SentimentClassifierRoberta(
-        encoder_roberta.detach().clone(), pooler_transformer_aan, 'sentiment_classifier_roberta_aan', **transformer_hyperparams)
+        AutoModel.from_pretrained('roberta-base', config=roberta_config),
+        pooler_transformer_aan, 'sentiment_classifier_roberta_aan', **transformer_hyperparams)
     sentiment_classifier_dynasent_aan = SentimentClassifierRoberta(
-        encoder_dynasent.detach().clone(), pooler_transformer_aan, 'sentiment_classifier_dynasent_aan', **transformer_hyperparams)
+        AutoModel.from_pretrained(os.path.join('models', 'dynasent_model1.bin'), config=roberta_config),
+        pooler_transformer_aan, 'sentiment_classifier_dynasent_aan', **transformer_hyperparams)
         
     return (sentiment_classifier_lstm_base,
         sentiment_classifier_roberta_base,
