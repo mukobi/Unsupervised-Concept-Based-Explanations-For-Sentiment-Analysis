@@ -1,3 +1,4 @@
+from json import encoder
 import os
 import torch
 import torch.nn as nn
@@ -27,7 +28,8 @@ roberta_tokenizer = AutoTokenizer.from_pretrained(
     max_length=128,
     padding='max_length')
 
-### Modular sentiment classifier definition
+# Modular sentiment classifier definition
+
 
 class SentimentClassifierModel(nn.Module):
     def __init__(self, n_classes, encoder_module, pooling_module):
@@ -45,11 +47,13 @@ class SentimentClassifierModel(nn.Module):
         pooled = self.pooling_module(reps)
         return self.classifier_module(pooled)
 
-### Classifiers (follow the Scikit-Learn model API).
+# Classifiers (follow the Scikit-Learn model API).
+
 
 class SentimentClassifierBase(TorchShallowNeuralClassifier):
     def __init__(self, encoder_module, pooling_module, *args, **kwargs):
         self.encoder_module = encoder_module
+        encoder_module.train()
         self.pooling_module = pooling_module
         super().__init__(*args, **kwargs)
 
@@ -59,6 +63,7 @@ class SentimentClassifierBase(TorchShallowNeuralClassifier):
     def build_dataset(self, X, y=None):
         """Dataset processing, e.g. tokenizing text."""
         raise NotImplementedError
+
 
 class SentimentClassifierRNN(SentimentClassifierBase):
     def build_dataset(self, X, y=None):
@@ -74,6 +79,7 @@ class SentimentClassifierRNN(SentimentClassifierBase):
             y = torch.tensor(y)
             dataset = torch.utils.data.TensorDataset(X, y)
         return dataset
+
 
 class SentimentClassifierRoberta(SentimentClassifierBase):
     def build_dataset(self, X, y=None):
@@ -96,21 +102,25 @@ class SentimentClassifierRoberta(SentimentClassifierBase):
             dataset = torch.utils.data.TensorDataset(indices, mask, y)
         return dataset
 
-### Pooling layer definitions
+# Pooling layer definitions
+
 
 class PoolingModuleBase(nn.Module):
     def forward(self, reps):
         raise NotImplementedError
+
 
 class PoolingModuleRNNLast(PoolingModuleBase):
     def forward(self, reps):
         """Takes the final hidden output as the pooled output."""
         return reps[-1]
 
+
 class PoolingModuleTransformerCLS(PoolingModuleBase):
     def forward(self, reps):
         """Takes the last-layer CLS rep as the pooled output."""
         return reps[0]
+
 
 class PoolingModuleRNNAAN(PoolingModuleBase):
     def forward(self, reps):
@@ -118,28 +128,31 @@ class PoolingModuleRNNAAN(PoolingModuleBase):
         # TODO(atharva): Implement AAN layers
         raise NotImplementedError
 
+
 class PoolingModuleTransformerAAN(PoolingModuleBase):
     def forward(self, reps):
         """Uses a concept-based abstraction-aggregation network over all transformer output reps."""
         # TODO(atharva): Implement AAN layers
         raise NotImplementedError
 
+
 def build_untrained_classifiers(X_train):
     """Instantiate our different models."""
     vocab = utils.get_vocab(X_train, mincount=2)
 
-    encoder_lstm = TorchRNNModel(
-            vocab_size=len(vocab),
-            use_embedding=self.use_embedding,
-            embed_dim=self.embed_dim,
-            rnn_cell_class=self.rnn_cell_class,
-            hidden_dim=self.hidden_dim,
-            bidirectional=self.bidirectional,
-            freeze_embedding=self.freeze_embedding)  # TODO define LSTM
-    encoder_dynasent = AutoModel.from_pretrained(os.path.join('models', 'dynasent_model1.bin'), config=roberta_config)
-    encoder_dynasent.train()
-    encoder_roberta = AutoModel.from_pretrained('roberta-base', config=roberta_config)
-    encoder_roberta.train()
+    encoder_lstm = None  # TODO define LSTM
+    # TorchRNNModel(
+    #     vocab_size=len(vocab),
+    #     use_embedding=self.use_embedding,
+    #     embed_dim=self.embed_dim,
+    #     rnn_cell_class=self.rnn_cell_class,
+    #     hidden_dim=self.hidden_dim,
+    #     bidirectional=self.bidirectional,
+    #     freeze_embedding=self.freeze_embedding)
+    encoder_roberta = AutoModel.from_pretrained(
+        'roberta-base', config=roberta_config)
+    encoder_dynasent = AutoModel.from_pretrained(os.path.join(
+        'models', 'dynasent_model1.bin'), config=roberta_config)
 
     pooler_lstm_last = PoolingModuleRNNLast()
     pooler_transformer_cls = PoolingModuleTransformerCLS()
@@ -152,9 +165,27 @@ def build_untrained_classifiers(X_train):
         'early_stopping': True,
         'display_progress': False,
     }
-    mod = TorchRNNClassifier(
-        sst_glove_vocab,
-        early_stopping=True)
+    lstm_hyperparams = {
+        'tol': 1e-5,           # for "earlier stopping" to prevent overfitting
+        'early_stopping': True,
+    }
 
-    sentiment_classifier_lstm_base = SentimentClassifierRNN(encoder_lstm, pooler_lstm_last, kwargs=)
-    sentiment_classifier_roberta_base = SentimentClassifierRoberta(encoder_roberta, pooler_transformer_cls, kwargs=transformer_hyperparams)
+    sentiment_classifier_lstm_base = SentimentClassifierRNN(
+        encoder_lstm, pooler_lstm_last, kwargs=lstm_hyperparams)
+    sentiment_classifier_roberta_base = SentimentClassifierRoberta(
+        encoder_roberta, pooler_transformer_cls, kwargs=transformer_hyperparams)
+    sentiment_classifier_dynasent_base = SentimentClassifierRoberta(
+        encoder_dynasent, pooler_transformer_cls, kwargs=transformer_hyperparams)
+    sentiment_classifier_lstm_aan = SentimentClassifierRNN(
+        encoder_lstm, pooler_lstm_aan, kwargs=lstm_hyperparams)
+    sentiment_classifier_roberta_aan = SentimentClassifierRoberta(
+        encoder_roberta, pooler_transformer_aan, kwargs=transformer_hyperparams)
+    sentiment_classifier_dynasent_aan = SentimentClassifierRoberta(
+        encoder_dynasent, pooler_transformer_aan, kwargs=transformer_hyperparams)
+        
+    return (sentiment_classifier_lstm_base,
+        sentiment_classifier_roberta_base,
+        sentiment_classifier_dynasent_base,
+        sentiment_classifier_lstm_aan,
+        sentiment_classifier_roberta_aan,
+        sentiment_classifier_dynasent_aan)
