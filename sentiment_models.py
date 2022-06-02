@@ -68,17 +68,11 @@ class PoolingModuleTransformerCLS(PoolingModuleBase):
         return reps.last_hidden_state[:, 0, :]
 
 
-class PoolingModuleRNNAAN(PoolingModuleBase):
-    def forward(self, reps):
-        """Uses a concept-based abstraction-aggregation network over all RNN output reps."""
-        # TODO(atharva): Implement AAN layers
-        raise NotImplementedError
-
-
-class PoolingModuleTransformerAAN(PoolingModuleBase):
+class PoolingModuleAAN(PoolingModuleBase):
     def forward(self, reps):
         """Uses a concept-based abstraction-aggregation network over all transformer output reps."""
         # TODO(atharva): Implement AAN layers
+        K = 10  # Hard code number of concepts for now based on whatever the paper uses
         # raise NotImplementedError
         return reps.last_hidden_state[:, 0, :]
 
@@ -146,7 +140,7 @@ class SentimentClassifierRoberta(SentimentClassifierTransformerBase):
     def __init__(self, use_aan, hyperparams):
         encoder_module = AutoModel.from_pretrained(
             'roberta-base', config=roberta_config)
-        pooling_module = PoolingModuleTransformerAAN(
+        pooling_module = PoolingModuleAAN(
         ) if use_aan else PoolingModuleTransformerCLS()
         name = 'sentiment_classifier_roberta_aan' if use_aan else 'sentiment_classifier_roberta_base'
         super().__init__(encoder_module, pooling_module, name, **hyperparams)
@@ -156,7 +150,7 @@ class SentimentClassifierDynasent(SentimentClassifierTransformerBase):
     def __init__(self, use_aan, hyperparams):
         encoder_module = AutoModel.from_pretrained(os.path.join(
             'models', 'dynasent_model1.bin'), config=roberta_config)
-        pooling_module = PoolingModuleTransformerAAN(
+        pooling_module = PoolingModuleAAN(
         ) if use_aan else PoolingModuleTransformerCLS()
         name = 'sentiment_classifier_dynasent_aan' if use_aan else 'sentiment_classifier_dynasent_base'
         super().__init__(encoder_module, pooling_module, name, **hyperparams)
