@@ -165,17 +165,17 @@ def build_untrained_classifier_models(X_train, transformer_hyperparams, lstm_hyp
 
 
     sentiment_classifier_lstm_base = None # SentimentClassifierRNN(
-        # encoder_lstm, pooler_lstm_last, kwargs=lstm_hyperparams)
+        # encoder_lstm.detach().clone(), pooler_lstm_last, kwargs=lstm_hyperparams)
     sentiment_classifier_roberta_base = SentimentClassifierRoberta(
-        encoder_roberta, pooler_transformer_cls, 'sentiment_classifier_roberta_base', **transformer_hyperparams)
+        encoder_roberta.detach().clone(), pooler_transformer_cls, 'sentiment_classifier_roberta_base', **transformer_hyperparams)
     sentiment_classifier_dynasent_base = SentimentClassifierRoberta(
-        encoder_dynasent, pooler_transformer_cls, 'sentiment_classifier_dynasent_base', **transformer_hyperparams)
+        encoder_dynasent.detach().clone(), pooler_transformer_cls, 'sentiment_classifier_dynasent_base', **transformer_hyperparams)
     sentiment_classifier_lstm_aan = None # SentimentClassifierRNN(
-        # encoder_lstm, pooler_lstm_aan, kwargs=lstm_hyperparams)
+        # encoder_lstm.detach().clone(), pooler_lstm_aan, kwargs=lstm_hyperparams)
     sentiment_classifier_roberta_aan = SentimentClassifierRoberta(
-        encoder_roberta, pooler_transformer_aan, 'sentiment_classifier_roberta_aan', **transformer_hyperparams)
+        encoder_roberta.detach().clone(), pooler_transformer_aan, 'sentiment_classifier_roberta_aan', **transformer_hyperparams)
     sentiment_classifier_dynasent_aan = SentimentClassifierRoberta(
-        encoder_dynasent, pooler_transformer_aan, 'sentiment_classifier_dynasent_aan', **transformer_hyperparams)
+        encoder_dynasent.detach().clone(), pooler_transformer_aan, 'sentiment_classifier_dynasent_aan', **transformer_hyperparams)
         
     return (sentiment_classifier_lstm_base,
         sentiment_classifier_roberta_base,
