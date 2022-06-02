@@ -162,7 +162,7 @@ def build_untrained_classifier_models(X_train):
     transformer_hyperparams = {
         'gradient_accumulation_steps': 2,
         'eta': 2e-05,
-        'max_iter': 1,
+        'max_iter': 10,
         'batch_size': 16,
         'n_iter_no_change': 5,
         'tol': 1e-5,
