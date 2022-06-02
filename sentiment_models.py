@@ -51,10 +51,11 @@ class SentimentClassifierModel(nn.Module):
 
 
 class SentimentClassifierBase(TorchShallowNeuralClassifier):
-    def __init__(self, encoder_module, pooling_module, *args, **kwargs):
+    def __init__(self, encoder_module, pooling_module, name, *args, **kwargs):
         self.encoder_module = encoder_module
         encoder_module.train()
         self.pooling_module = pooling_module
+        self.name = name
         super().__init__(*args, **kwargs)
 
     def build_graph(self):
@@ -63,6 +64,9 @@ class SentimentClassifierBase(TorchShallowNeuralClassifier):
     def build_dataset(self, X, y=None):
         """Dataset processing, e.g. tokenizing text."""
         raise NotImplementedError
+
+    def __repr__(self):
+        return self.name
 
 
 class SentimentClassifierRNN(SentimentClassifierBase):
@@ -136,7 +140,7 @@ class PoolingModuleTransformerAAN(PoolingModuleBase):
         raise NotImplementedError
 
 
-def build_untrained_classifier_models(X_train):
+def build_untrained_classifier_models(X_train, transformer_hyperparams, lstm_hyperparams):
     """Instantiate our different models."""
     vocab = utils.get_vocab(X_train, mincount=2)
 
@@ -159,33 +163,19 @@ def build_untrained_classifier_models(X_train):
     pooler_lstm_aan = PoolingModuleRNNAAN()
     pooler_transformer_aan = PoolingModuleTransformerAAN()
 
-    transformer_hyperparams = {
-        'gradient_accumulation_steps': 2,
-        'eta': 2e-05,
-        'max_iter': 10,
-        'batch_size': 16,
-        'n_iter_no_change': 5,
-        'tol': 1e-5,
-        'early_stopping': True,
-        'display_progress': True,
-    }
-    lstm_hyperparams = {
-        'tol': 1e-5,           # for "earlier stopping" to prevent overfitting
-        'early_stopping': True,
-    }
 
     sentiment_classifier_lstm_base = None # SentimentClassifierRNN(
         # encoder_lstm, pooler_lstm_last, kwargs=lstm_hyperparams)
     sentiment_classifier_roberta_base = SentimentClassifierRoberta(
-        encoder_roberta, pooler_transformer_cls, **transformer_hyperparams)
+        encoder_roberta, pooler_transformer_cls, 'sentiment_classifier_roberta_base', **transformer_hyperparams)
     sentiment_classifier_dynasent_base = SentimentClassifierRoberta(
-        encoder_dynasent, pooler_transformer_cls, **transformer_hyperparams)
+        encoder_dynasent, pooler_transformer_cls, 'sentiment_classifier_dynasent_base', **transformer_hyperparams)
     sentiment_classifier_lstm_aan = None # SentimentClassifierRNN(
         # encoder_lstm, pooler_lstm_aan, kwargs=lstm_hyperparams)
     sentiment_classifier_roberta_aan = SentimentClassifierRoberta(
-        encoder_roberta, pooler_transformer_aan, **transformer_hyperparams)
+        encoder_roberta, pooler_transformer_aan, 'sentiment_classifier_roberta_aan', **transformer_hyperparams)
     sentiment_classifier_dynasent_aan = SentimentClassifierRoberta(
-        encoder_dynasent, pooler_transformer_aan, **transformer_hyperparams)
+        encoder_dynasent, pooler_transformer_aan, 'sentiment_classifier_dynasent_aan', **transformer_hyperparams)
         
     return (sentiment_classifier_lstm_base,
         sentiment_classifier_roberta_base,
