@@ -54,7 +54,7 @@ class PoolingModuleTransformerCLS(PoolingModuleBase):
 class Attention_Concepts(torch.nn.Module):
     def __init__(self, input_size, n_concepts, device=torch.device("cpu")):
         """
-        implementation of self-attention.
+        implementation of multi-headed self-attention.
         """
         super().__init__()
         self.n_concepts = n_concepts
@@ -70,6 +70,7 @@ class Attention_Concepts(torch.nn.Module):
             attn_weights: attention weights
             attn_ctx_vec: context vector
         """
+        input_ = input_.last_hidden_state
         batch_size = input_.size(0)
 
         attn_weight = []
@@ -157,8 +158,9 @@ class PoolingModuleAAN(PoolingModuleBase):
             "attn_concept": attn_cpt,
             "ctx_concept": ctx_cpt,
         }
+        self.output = output
 
-        return output
+        return ctx
 
 
 ### build_dataset function definitions ###
