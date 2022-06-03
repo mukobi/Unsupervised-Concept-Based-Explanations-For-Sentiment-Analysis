@@ -156,9 +156,10 @@ class SentimentClassifierBase(TorchShallowNeuralClassifier):
         self.pooling_module.train()
 
     def build_graph(self):
-        return SentimentClassifierModel(
+        self.model = SentimentClassifierModel(
             self.n_classes_, self.encoder_module, self.pooling_module
         ).to(device)
+        return self.model
 
     @abstractmethod
     def build_dataset(self, X, y=None):
