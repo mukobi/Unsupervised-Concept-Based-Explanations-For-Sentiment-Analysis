@@ -1,13 +1,13 @@
 from json import encoder
 import os
-from sqlalchemy import false
 import torch
 import torch.nn as nn
 import transformers
 from transformers import AutoModel, AutoTokenizer, AutoConfig
+from abc import abstractmethod, abstractstaticmethod
+
 
 import utils
-from torch_rnn_classifier import TorchRNNModel
 from torch_shallow_neural_classifier import TorchShallowNeuralClassifier
 
 transformers.utils.logging.set_verbosity_error()
@@ -52,8 +52,13 @@ class SentimentClassifierModel(nn.Module):
 ### Pooling layer definitions ###
 
 class PoolingModuleBase(nn.Module):
+    @abstractmethod
     def forward(self, reps):
-        raise NotImplementedError
+        """
+        Given an input-sequence-length array of hidden representations, pool
+        them into a fixed-length input for the classification layer.
+        """
+        pass
 
 
 class PoolingModuleRNNLast(PoolingModuleBase):
@@ -74,98 +79,142 @@ class PoolingModuleAAN(PoolingModuleBase):
         # TODO(atharva): Implement AAN layers
         K = 10  # Hard code number of concepts for now based on whatever the paper uses
         # raise NotImplementedError
-        return reps.last_hidden_state[:, 0, :]
+        return reps.last_hidden_state[:, 0, :]  # CLS token, will change
+
+
+### Build Dataset function definitions ###
+def _build_dataset_lstm(self, X, y):
+    # TODO see build_dataset and _prepare_sequences in TorchRNNClassifier
+    X = [x.split() for x in X]
+    if y is None:
+        dataset = torch.utils.data.TensorDataset(X)
+    else:
+        self.classes_ = sorted(set(y))
+        self.n_classes_ = len(self.classes_)
+        class2index = dict(zip(self.classes_, range(self.n_classes_)))
+        y = [class2index[label] for label in y]
+        y = torch.tensor(y)
+        dataset = torch.utils.data.TensorDataset(X, y)
+    return dataset
+
+
+def _build_dataset_roberta(self, X, y):
+    data = roberta_tokenizer.batch_encode_plus(
+        X,
+        max_length=None,
+        add_special_tokens=True,
+        padding='longest',
+        return_attention_mask=True)
+    indices = torch.tensor(data['input_ids'])
+    mask = torch.tensor(data['attention_mask'])
+    if y is None:
+        dataset = torch.utils.data.TensorDataset(indices, mask)
+    else:
+        self.classes_ = sorted(set(y))
+        self.n_classes_ = len(self.classes_)
+        class2index = dict(zip(self.classes_, range(self.n_classes_)))
+        y = [class2index[label] for label in y]
+        y = torch.tensor(y)
+        dataset = torch.utils.data.TensorDataset(indices, mask, y)
+    return dataset
 
 
 ### Classifiers (follow the Scikit-Learn model API) ###
 
 class SentimentClassifierBase(TorchShallowNeuralClassifier):
-    def __init__(self, encoder_module=None, pooling_module=None, name=None, *args, **kwargs):
-        self.encoder_module = encoder_module
-        encoder_module.train()
-        self.pooling_module = pooling_module
-        self.name = name
+    def __init__(self, *args, **kwargs):
+        self.encoder_module = self.build_encoder_module()
+        self.pooling_module = self.build_pooling_module()
+        self.encoder_module.train()
+        self.pooling_module.train()
         super().__init__(*args, **kwargs)
 
     def build_graph(self):
         return SentimentClassifierModel(self.n_classes_, self.encoder_module, self.pooling_module).to(device)
 
+    @abstractmethod
     def build_dataset(self, X, y=None):
         """Dataset processing, e.g. tokenizing text."""
-        raise NotImplementedError
+        pass
 
-    def __repr__(self):
-        return self.name
+    @abstractmethod
+    def build_encoder_module(self):
+        """Instantiate the encoder module once."""
+        pass
+
+    @abstractmethod
+    def build_pooling_module(self):
+        """Instantiate the pooling module once."""
+        pass
 
 
 class SentimentClassifierLSTM(SentimentClassifierBase):
+    def __repr__(self):
+        return "LSTM (Baseline)"
+
     def build_dataset(self, X, y=None):
-        # TODO see build_dataset and _prepare_sequences in TorchRNNClassifier
-        X = [x.split() for x in X]
-        if y is None:
-            dataset = torch.utils.data.TensorDataset(X)
-        else:
-            self.classes_ = sorted(set(y))
-            self.n_classes_ = len(self.classes_)
-            class2index = dict(zip(self.classes_, range(self.n_classes_)))
-            y = [class2index[label] for label in y]
-            y = torch.tensor(y)
-            dataset = torch.utils.data.TensorDataset(X, y)
-        return dataset
+        return _build_dataset_lstm(self, X, y)
+
+    def build_encoder_module(self):
+        return None  # TODO build LSTM
+
+        # vocab = utils.get_vocab(X_train, mincount=2)
+        # TorchRNNModel(
+        #     vocab_size=len(vocab),
+        #     use_embedding=self.use_embedding,
+        #     embed_dim=self.embed_dim,
+        #     rnn_cell_class=self.rnn_cell_class,
+        #     hidden_dim=self.hidden_dim,
+        #     bidirectional=self.bidirectional,
+        #     freeze_embedding=self.freeze_embedding)
+
+    def build_pooling_module(self):
+        return PoolingModuleRNNLast()
 
 
-class SentimentClassifierTransformerBase(SentimentClassifierBase):
+class SentimentClassifierLSTMAAN(SentimentClassifierLSTM):
+    def __repr__(self):
+        return "LSTM (AAN)"
+
+    def build_pooling_module(self):
+        return PoolingModuleAAN()
+
+
+class SentimentClassifierRoberta(SentimentClassifierBase):
+    def __repr__(self):
+        return "RoBERTa-Base (Baseline)"
+
     def build_dataset(self, X, y=None):
-        data = roberta_tokenizer.batch_encode_plus(
-            X,
-            max_length=None,
-            add_special_tokens=True,
-            padding='longest',
-            return_attention_mask=True)
-        indices = torch.tensor(data['input_ids'])
-        mask = torch.tensor(data['attention_mask'])
-        if y is None:
-            dataset = torch.utils.data.TensorDataset(indices, mask)
-        else:
-            self.classes_ = sorted(set(y))
-            self.n_classes_ = len(self.classes_)
-            class2index = dict(zip(self.classes_, range(self.n_classes_)))
-            y = [class2index[label] for label in y]
-            y = torch.tensor(y)
-            dataset = torch.utils.data.TensorDataset(indices, mask, y)
-        return dataset
+        return _build_dataset_roberta(self, X, y)
 
-
-class SentimentClassifierRoberta(SentimentClassifierTransformerBase):
-    def __init__(self, use_aan, hyperparams):
-        encoder_module = AutoModel.from_pretrained(
+    def build_encoder_module(self):
+        return AutoModel.from_pretrained(
             'roberta-base', config=roberta_config)
-        pooling_module = PoolingModuleAAN(
-        ) if use_aan else PoolingModuleTransformerCLS()
-        name = 'sentiment_classifier_roberta_aan' if use_aan else 'sentiment_classifier_roberta_base'
-        super().__init__(encoder_module, pooling_module, name, **hyperparams)
+
+    def build_pooling_module(self):
+        return PoolingModuleTransformerCLS()
 
 
-class SentimentClassifierDynasent(SentimentClassifierTransformerBase):
-    def __init__(self, use_aan, hyperparams):
-        encoder_module = AutoModel.from_pretrained(os.path.join(
+class SentimentClassifierRobertaAAN(SentimentClassifierRoberta):
+    def __repr__(self):
+        return "RoBERTa-Base (AAN)"
+
+    def build_pooling_module(self):
+        return PoolingModuleAAN()
+
+
+class SentimentClassifierDynasent(SentimentClassifierRoberta):
+    def __repr__(self):
+        return "DynaSent-M1 (Baseline)"
+
+    def build_encoder_module(self):
+        return AutoModel.from_pretrained(os.path.join(
             'models', 'dynasent_model1.bin'), config=roberta_config)
-        pooling_module = PoolingModuleAAN(
-        ) if use_aan else PoolingModuleTransformerCLS()
-        name = 'sentiment_classifier_dynasent_aan' if use_aan else 'sentiment_classifier_dynasent_base'
-        super().__init__(encoder_module, pooling_module, name, **hyperparams)
 
 
-def todo_build_rnn(X_train, transformer_hyperparams, lstm_hyperparams):
-    """Instantiate our different models."""
-    vocab = utils.get_vocab(X_train, mincount=2)
+class SentimentClassifierDynasentAAN(SentimentClassifierDynasent):
+    def __repr__(self):
+        return "DynaSent-M1 (AAN)"
 
-    encoder_lstm = None  # TODO define LSTM
-    # TorchRNNModel(
-    #     vocab_size=len(vocab),
-    #     use_embedding=self.use_embedding,
-    #     embed_dim=self.embed_dim,
-    #     rnn_cell_class=self.rnn_cell_class,
-    #     hidden_dim=self.hidden_dim,
-    #     bidirectional=self.bidirectional,
-    #     freeze_embedding=self.freeze_embedding)
+    def build_pooling_module(self):
+        return PoolingModuleAAN()
