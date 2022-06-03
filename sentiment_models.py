@@ -1,14 +1,12 @@
-from json import encoder
 import os
 import torch
 import torch.nn as nn
 import transformers
 from transformers import AutoModel, AutoTokenizer, AutoConfig
-from abc import abstractmethod, abstractstaticmethod
+from abc import abstractmethod
 
-import utils
 from torch_shallow_neural_classifier import TorchShallowNeuralClassifier
-from torch_rnn_classifier import TorchRNNDataset
+from aan_attention import AttentionConcepts, AttentionSelf
 
 transformers.utils.logging.set_verbosity_error()
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -28,7 +26,6 @@ roberta_tokenizer = AutoTokenizer.from_pretrained(
 
 ### Pooling layer definitions ###
 
-
 class PoolingModuleBase(nn.Module):
     @abstractmethod
     def forward(self, reps):
@@ -39,109 +36,20 @@ class PoolingModuleBase(nn.Module):
         pass
 
 
-class PoolingModuleRNNLast(PoolingModuleBase):
-    def forward(self, reps):
-        """Takes the final hidden output as the pooled output."""
-        return reps[-1]
-
-
 class PoolingModuleTransformerCLS(PoolingModuleBase):
     def forward(self, reps):
         """Takes the last-layer CLS rep as the pooled output."""
         return reps.last_hidden_state[:, 0, :]
 
 
-class AttentionConcepts(torch.nn.Module):
-    def __init__(self, input_size, n_concepts):
-        """
-        Multi-headed self-attention: abstraction-attention (abs).
-        https://github.com/tshi04/ACCE/blob/master/LeafNATS/modules/attention/attention_concepts.py
-        """
-        super().__init__()
-        self.n_concepts = n_concepts
-
-        self.ff = torch.nn.ModuleList(
-            [torch.nn.Linear(input_size, 1, bias=False)
-             for k in range(n_concepts)])
-
-    def forward(self, input_, mask=None):
-        """
-        input vector: input_
-        output:
-            attn_weights: attention weights
-            attn_ctx_vec: context vector
-        """
-        input_ = input_.last_hidden_state
-        batch_size = input_.size(0)
-
-        attn_weight = []
-        attn_ctx_vec = []
-        for k in range(self.n_concepts):
-            attn_ = self.ff[k](input_).squeeze(2)
-            if mask is not None:
-                attn_ = attn_.masked_fill(mask == 0, -1e9)
-            attn_ = torch.softmax(attn_, dim=1)
-            ctx_vec = torch.bmm(attn_.unsqueeze(1), input_).squeeze(1)
-            attn_weight.append(attn_)
-            attn_ctx_vec.append(ctx_vec)
-
-        attn_weight = torch.cat(attn_weight, 0).view(
-            self.n_concepts, batch_size, -1)
-        attn_weight = attn_weight.transpose(0, 1)
-        attn_ctx_vec = torch.cat(attn_ctx_vec, 0).view(
-            self.n_concepts, batch_size, -1)
-        attn_ctx_vec = attn_ctx_vec.transpose(0, 1)
-
-        return attn_weight, attn_ctx_vec
-
-
-class AttentionSelf(torch.nn.Module):
-    def __init__(
-        self, input_size, hidden_size, dropout_rate=None
-    ):
-        """
-        Single-headed self-attention: aggregation attention (agg).
-        """
-        super().__init__()
-        self.dropout_rate = dropout_rate
-
-        self.ff1 = torch.nn.Linear(input_size, hidden_size)
-        self.ff2 = torch.nn.Linear(hidden_size, 1, bias=False)
-        if dropout_rate is not None:
-            self.model_drop = torch.nn.Dropout(dropout_rate)
-
-    def forward(self, input_, mask=None):
-        """
-        input vector: input_
-        output:
-            attn_: attention weights
-            ctx_vec: context vector
-        """
-        attn_ = torch.tanh(self.ff1(input_))
-        attn_ = self.ff2(attn_).squeeze(2)
-        if mask is not None:
-            attn_ = attn_.masked_fill(mask == 0, -1e9)
-        # dropout method 1.
-        # if self.dropout_rate is not None:
-        #     drop_mask = Variable(torch.ones(attn_.size())).to(self.device)
-        #     drop_mask = self.model_drop(drop_mask)
-        #     attn_ = attn_.masked_fill(drop_mask == 0, -1e9)
-
-        attn_ = torch.softmax(attn_, dim=1)
-        # dropout method 2.
-        if self.dropout_rate is not None:
-            attn_ = self.model_drop(attn_)
-        ctx_vec = torch.bmm(attn_.unsqueeze(1), input_).squeeze(1)
-
-        return attn_, ctx_vec
-
-
 class PoolingModuleAAN(PoolingModuleBase):
     def __init__(self, n_concepts=10):
         super().__init__()
         self.n_concepts = n_concepts
-        self.abs = AttentionConcepts(input_size=HIDDEN_DIM, n_concepts=self.n_concepts).to(device)
-        self.agg = AttentionSelf(input_size=HIDDEN_DIM, hidden_size=HIDDEN_DIM).to(device)
+        self.abs = AttentionConcepts(
+            input_size=HIDDEN_DIM, n_concepts=self.n_concepts).to(device)
+        self.agg = AttentionSelf(
+            input_size=HIDDEN_DIM, hidden_size=HIDDEN_DIM).to(device)
 
     def forward(self, reps):
         """Uses a concept-based abstraction-aggregation network over all transformer output reps."""
@@ -151,11 +59,14 @@ class PoolingModuleAAN(PoolingModuleBase):
         return self.ctx
 
 
+### Loss function ###
+
 class AANLoss(nn.Module):
     """Cross-entropy loss + an abstraction diversity penalty."""
+
     def __init__(self, pooling_module_aan):
         super().__init__()
-        self.pooling_module_aan = pooling_module_aan 
+        self.pooling_module_aan = pooling_module_aan
         self.reduction = 'mean'
         self.cross_entropy = nn.CrossEntropyLoss(reduction=self.reduction)
 
@@ -176,34 +87,7 @@ class AANLoss(nn.Module):
         return self.cross_entropy(batch_preds, y_batch) + diversity_penalty
 
 
-
 ### build_dataset function definitions ###
-
-
-def _build_dataset_lstm(self, X, y):
-    # Split each example sentence by whitespace for simplicity
-    X = [sentence.split() for sentence in X]
-
-    # Prepare sequences by
-    new_X = []
-    seq_lengths = []
-    index = dict(zip(self.vocab, range(len(self.vocab))))
-    unk_index = index["$UNK"]
-    for ex in X:
-        seq = [index.get(w, unk_index) for w in ex]
-        seq = torch.tensor(seq)
-        new_X.append(seq)
-        seq_lengths.append(len(seq))
-    seq_lengths = torch.tensor(seq_lengths)
-
-    if y is None:
-        return TorchRNNDataset(new_X, seq_lengths)
-    else:
-        self.classes_ = sorted(set(y))
-        self.n_classes_ = len(self.classes_)
-        class2index = dict(zip(self.classes_, range(self.n_classes_)))
-        y = [class2index[label] for label in y]
-        return TorchRNNDataset(new_X, seq_lengths, y)
 
 
 def _build_dataset_roberta(self, X, y):
@@ -285,62 +169,18 @@ class SentimentClassifierBase(TorchShallowNeuralClassifier):
         """Instantiate the pooling module once."""
         pass
 
+
 class SentimentClassifierAANBase(SentimentClassifierBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.loss = AANLoss(self.pooling_module)
-    
-    def build_pooling_module(self):
-        return PoolingModuleAAN()
-
-## LSTM ##
-class EncoderModuleLSTM(nn.Module):
-    """Use an LSTM as an encoder by returning the hidden states."""
-
-    def __init__(self):
-        super().__init__()
-        self.embedding = nn.Embedding(HIDDEN_DIM, HIDDEN_DIM)
-        self.lstm = nn.LSTM(input_size=HIDDEN_DIM, hidden_size=HIDDEN_DIM)
-
-    def forward(self, X, seq_lengths):
-        X = self.embedding(X)
-        embeddings = torch.nn.utils.rnn.pack_padded_sequence(
-            X,
-            batch_first=True,
-            lengths=seq_lengths.cpu(),  # TODO maybe try no cpu
-            enforce_sorted=False,
-        )
-        outputs, _ = self.lstm(embeddings)
-        return outputs
-
-
-class SentimentClassifierLSTM(SentimentClassifierBase):
-    def __init__(self, *args, X_train=[], **kwargs):
-        self.vocab = utils.get_vocab(X_train, mincount=2)
-        super().__init__(*args, **kwargs)
-
-    def __repr__(self):
-        return "LSTM (Baseline)"
-
-    def build_dataset(self, X, y=None):
-        return _build_dataset_lstm(self, X, y)
-
-    def build_encoder_module(self):
-        return EncoderModuleLSTM()
-
-    def build_pooling_module(self):
-        return PoolingModuleRNNLast()
-
-
-class SentimentClassifierLSTMAAN(SentimentClassifierLSTM):
-    def __repr__(self):
-        return "LSTM (AAN)"
 
     def build_pooling_module(self):
         return PoolingModuleAAN()
-
 
 ## RoBERTa-Base ##
+
+
 class SentimentClassifierRoberta(SentimentClassifierBase):
     def __repr__(self):
         return "RoBERTa-Base (Baseline)"
@@ -366,9 +206,7 @@ class SentimentClassifierDynasent(SentimentClassifierRoberta):
         return "DynaSent-M1 (Baseline)"
 
     def build_encoder_module(self):
-        return AutoModel.from_pretrained(
-            os.path.join("models", "dynasent_model1.bin"), config=roberta_config
-        )
+        return AutoModel.from_pretrained(os.path.join("models", "dynasent_model1.bin"), config=roberta_config)
 
 
 class SentimentClassifierDynasentAAN(SentimentClassifierAANBase, SentimentClassifierDynasent):
