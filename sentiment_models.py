@@ -51,17 +51,18 @@ class PoolingModuleTransformerCLS(PoolingModuleBase):
         return reps.last_hidden_state[:, 0, :]
 
 
-class Attention_Concepts(torch.nn.Module):
-    def __init__(self, input_size, n_concepts, device=torch.device("cpu")):
+class AttentionConcepts(torch.nn.Module):
+    def __init__(self, input_size, n_concepts):
         """
-        implementation of multi-headed self-attention.
+        Multi-headed self-attention: abstraction-attention (abs).
+        https://github.com/tshi04/ACCE/blob/master/LeafNATS/modules/attention/attention_concepts.py
         """
         super().__init__()
         self.n_concepts = n_concepts
 
         self.ff = torch.nn.ModuleList(
-            [torch.nn.Linear(input_size, 1, bias=False) for k in range(n_concepts)]
-        ).to(device)
+            [torch.nn.Linear(input_size, 1, bias=False)
+             for k in range(n_concepts)])
 
     def forward(self, input_, mask=None):
         """
@@ -84,9 +85,11 @@ class Attention_Concepts(torch.nn.Module):
             attn_weight.append(attn_)
             attn_ctx_vec.append(ctx_vec)
 
-        attn_weight = torch.cat(attn_weight, 0).view(self.n_concepts, batch_size, -1)
+        attn_weight = torch.cat(attn_weight, 0).view(
+            self.n_concepts, batch_size, -1)
         attn_weight = attn_weight.transpose(0, 1)
-        attn_ctx_vec = torch.cat(attn_ctx_vec, 0).view(self.n_concepts, batch_size, -1)
+        attn_ctx_vec = torch.cat(attn_ctx_vec, 0).view(
+            self.n_concepts, batch_size, -1)
         attn_ctx_vec = attn_ctx_vec.transpose(0, 1)
 
         return attn_weight, attn_ctx_vec
@@ -94,14 +97,13 @@ class Attention_Concepts(torch.nn.Module):
 
 class AttentionSelf(torch.nn.Module):
     def __init__(
-        self, input_size, hidden_size, dropout_rate=None, device=torch.device("cpu")
+        self, input_size, hidden_size, dropout_rate=None
     ):
         """
-        implementation of self-attention.
+        Single-headed self-attention: aggregation attention (agg).
         """
         super().__init__()
         self.dropout_rate = dropout_rate
-        self.device = device
 
         self.ff1 = torch.nn.Linear(input_size, hidden_size)
         self.ff2 = torch.nn.Linear(hidden_size, 1, bias=False)
@@ -138,29 +140,41 @@ class PoolingModuleAAN(PoolingModuleBase):
     def __init__(self, n_concepts=10):
         super().__init__()
         self.n_concepts = n_concepts
-        self.abs = Attention_Concepts(
-            input_size=768, n_concepts=self.n_concepts, device=device
-        ).to(device)
-
-        self.agg = AttentionSelf(input_size=768, hidden_size=768, device=device).to(
-            device
-        )
+        self.abs = AttentionConcepts(input_size=HIDDEN_DIM, n_concepts=self.n_concepts).to(device)
+        self.agg = AttentionSelf(input_size=HIDDEN_DIM, hidden_size=HIDDEN_DIM).to(device)
 
     def forward(self, reps):
         """Uses a concept-based abstraction-aggregation network over all transformer output reps."""
-        # TODO(atharva): Implement AAN layers
+        self.attn_cpt, self.ctx_cpt = self.abs(reps)
+        self.attn, self.ctx = self.agg(self.ctx_cpt)
 
-        attn_cpt, ctx_cpt = self.abs(reps)
-        attn, ctx = self.agg(ctx_cpt)
-        output = {
-            "attn": attn,
-            "ctx": ctx,
-            "attn_concept": attn_cpt,
-            "ctx_concept": ctx_cpt,
-        }
-        self.output = output
+        return self.ctx
 
-        return ctx
+
+class AANLoss(nn.Module):
+    """Cross-entropy loss + an abstraction diversity penalty."""
+    def __init__(self, pooling_module_aan):
+        super().__init__()
+        self.pooling_module_aan = pooling_module_aan 
+        self.reduction = 'mean'
+        self.cross_entropy = nn.CrossEntropyLoss(reduction=self.reduction)
+
+    def forward(self, batch_preds, y_batch):
+        # Read the concept attention weights from the last batch
+        attn_cpt = self.pooling_module_aan.attn_cpt
+
+        batch_size = attn_cpt.size(0)
+        cpt_cross = torch.bmm(attn_cpt, attn_cpt.transpose(1, 2))
+        diag = torch.eye(
+            cpt_cross.size(1), cpt_cross.size(2)
+        ).to(device)
+        diag = diag.unsqueeze(0).repeat(batch_size, 1, 1)
+        cpt_cross = cpt_cross - diag
+
+        diversity_penalty = torch.sqrt(torch.mean(cpt_cross*cpt_cross))
+
+        return self.cross_entropy(batch_preds, y_batch) + diversity_penalty
+
 
 
 ### build_dataset function definitions ###
@@ -232,8 +246,7 @@ class SentimentClassifierModel(nn.Module):
         self.classifier_module = nn.Sequential(
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM),
             HIDDEN_ACTIVATION(),
-            nn.Linear(HIDDEN_DIM, HIDDEN_DIM),
-        )
+            nn.Linear(HIDDEN_DIM, HIDDEN_DIM))
 
     def forward(self, *args):
         reps = self.encoder_module(*args)
@@ -272,6 +285,13 @@ class SentimentClassifierBase(TorchShallowNeuralClassifier):
         """Instantiate the pooling module once."""
         pass
 
+class SentimentClassifierAANBase(SentimentClassifierBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.loss = AANLoss(self.pooling_module)
+    
+    def build_pooling_module(self):
+        return PoolingModuleAAN()
 
 ## LSTM ##
 class EncoderModuleLSTM(nn.Module):
@@ -335,12 +355,9 @@ class SentimentClassifierRoberta(SentimentClassifierBase):
         return PoolingModuleTransformerCLS()
 
 
-class SentimentClassifierRobertaAAN(SentimentClassifierRoberta):
+class SentimentClassifierRobertaAAN(SentimentClassifierAANBase, SentimentClassifierRoberta):
     def __repr__(self):
         return "RoBERTa-Base (AAN)"
-
-    def build_pooling_module(self):
-        return PoolingModuleAAN()
 
 
 ## DynaSent Model 1 ##
@@ -354,9 +371,6 @@ class SentimentClassifierDynasent(SentimentClassifierRoberta):
         )
 
 
-class SentimentClassifierDynasentAAN(SentimentClassifierDynasent):
+class SentimentClassifierDynasentAAN(SentimentClassifierAANBase, SentimentClassifierDynasent):
     def __repr__(self):
         return "DynaSent-M1 (AAN)"
-
-    def build_pooling_module(self):
-        return PoolingModuleAAN()
