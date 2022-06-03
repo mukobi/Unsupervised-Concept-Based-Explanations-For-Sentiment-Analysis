@@ -24,7 +24,12 @@ roberta_tokenizer = AutoTokenizer.from_pretrained(
 )
 
 
+def phi(text):
+    return text
+
+
 ### Pooling layer definitions ###
+
 
 class PoolingModuleBase(nn.Module):
     @abstractmethod
@@ -61,6 +66,7 @@ class PoolingModuleAAN(PoolingModuleBase):
 
 ### Loss function ###
 
+# TODO consider moving to aan_attention.py
 class AANLoss(nn.Module):
     """Cross-entropy loss + an abstraction diversity penalty."""
 
