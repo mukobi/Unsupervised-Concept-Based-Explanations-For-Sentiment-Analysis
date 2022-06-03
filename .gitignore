@@ -129,4 +129,5 @@ dmypy.json
 .pyre/
 
 # PyTorch model binaries
-models
+models/*
+!models/.keepdir
