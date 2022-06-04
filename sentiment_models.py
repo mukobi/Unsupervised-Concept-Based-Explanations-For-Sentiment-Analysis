@@ -118,10 +118,6 @@ def _build_dataset_roberta(self, X, y):
     return dataset
 
 
-### Concept interpretability function definitions ###
-def __get_concept_explanation(self, input):
-    # TODO Implement the probabilistic equations to get the scores and keywords
-    raise NotImplementedError
 
 
 ### Modular sentiment classifier module definition ###

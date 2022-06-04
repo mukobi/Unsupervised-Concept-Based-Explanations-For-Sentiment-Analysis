@@ -1,5 +1,7 @@
 # Unsupervised-Concept-Based-Explanations-For-Sentiment-Analysis
-Learning Unsupervised Concept-Based Explanations for Sentiment Analysis. CS 224U final project.
+Learning Unsupervised Concept-Based Explanations for Sentiment Analysis - Stanford CS 224U final project.
+
+We build baseline and abstraction-aggregation network (AAN) versions of transformer classifiers and fine-tune them for sentiment classification. We compare their qualitative classification performance and find introducing the penalties on the interpretable AAN models does not meaningfully impact performance. Despite this, the AAN models are able to produce useful concept-based explanations for their classifications, and we can use this to transparently discover errors and biases in the model (?).
 
 ## 1. Setup
 
