@@ -14,7 +14,7 @@ Download `dynasent_model1.bin` from https://drive.google.com/drive/folders/1dpKr
 ## 2. Testing
 
 ### 2.1 Train and Save Models
-Run [train_and_save_models.ipynb](./train_and_save_models.ipynb) to train 4 models (RoBERTa-Base, DynaSent Model 1, and a version of each made into an Attention-Abstraction Network) on the training data (DynaSent Round 1). This will fine-tune these models for sentiment analysis and save the resulting experiment dicts (which contain the best trained model in the `'model'` value) to a local `models` folder.
+Run [train_and_save_models.ipynb](./train_and_save_models.ipynb) to train 4 models (RoBERTa-Base, DynaSent Model 1, and a version of each made into an Attention-Abstraction Network) on the training data (DynaSent Round 2). This will fine-tune these models for sentiment analysis and save the resulting experiment dicts (which contain the best trained model in the `'model'` value) to a local `models` folder.
 
 ### 2.2 Evaluate Trained Models
 Run [evaluate_trained_models.ipynb](./evaluate_trained_models.ipynb) to evaluate the trained models. This will plot their training and compare their performance on the held-out DynaSent test set as well as demonstrating some concept-based explanations for certain test examples.
