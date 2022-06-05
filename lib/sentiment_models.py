@@ -5,8 +5,8 @@ import transformers
 from transformers import AutoModel, AutoTokenizer, AutoConfig
 from abc import abstractmethod
 
-from torch_shallow_neural_classifier import TorchShallowNeuralClassifier
-from aan_attention import AttentionConcepts, AttentionSelf
+from lib.torch_shallow_neural_classifier import TorchShallowNeuralClassifier
+from lib.aan_attention import AttentionConcepts, AttentionSelf
 
 transformers.utils.logging.set_verbosity_error()
 device = "cuda" if torch.cuda.is_available() else "cpu"

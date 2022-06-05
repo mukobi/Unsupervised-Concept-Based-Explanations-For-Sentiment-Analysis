@@ -6,7 +6,8 @@ from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, f1_score
 import scipy.stats
-import utils
+
+import lib.utils as utils
 
 __author__ = "Christopher Potts"
 __version__ = "CS224u, Stanford, Spring 2022"

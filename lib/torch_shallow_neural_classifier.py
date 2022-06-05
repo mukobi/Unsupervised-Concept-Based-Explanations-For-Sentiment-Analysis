@@ -2,8 +2,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.utils.data
-from torch_model_base import TorchModelBase
-import utils
+from lib.torch_model_base import TorchModelBase
+
+import lib.utils as utils
 
 __author__ = "Christopher Potts"
 __version__ = "CS224u, Stanford, Spring 2022"

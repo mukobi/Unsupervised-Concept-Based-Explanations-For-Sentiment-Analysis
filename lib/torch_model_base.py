@@ -4,10 +4,11 @@ import pickle
 from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
-import utils
 # NOTE: Added by Gabe Mukobi
 import time
 import sys
+
+import lib.utils as utils
 
 __author__ = "Christopher Potts"
 __version__ = "CS224u, Stanford, Spring 2022"
