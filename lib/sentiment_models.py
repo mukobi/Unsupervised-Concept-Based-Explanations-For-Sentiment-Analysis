@@ -14,6 +14,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 ### Config ###
 HIDDEN_DIM = 768
 HIDDEN_ACTIVATION = nn.ReLU
+NUM_CONCEPTS = 10
 
 # TODO move this into init of roberta classifier class
 roberta_config = AutoConfig.from_pretrained(
@@ -48,7 +49,7 @@ class PoolingModuleTransformerCLS(PoolingModuleBase):
 
 
 class PoolingModuleAAN(PoolingModuleBase):
-    def __init__(self, n_concepts=10):
+    def __init__(self, n_concepts=NUM_CONCEPTS):
         super().__init__()
         self.n_concepts = n_concepts
         self.abs = AttentionConcepts(
@@ -58,6 +59,7 @@ class PoolingModuleAAN(PoolingModuleBase):
 
     def forward(self, reps):
         """Uses a concept-based abstraction-aggregation network over all transformer output reps."""
+        # TODO rename these to attn_abs, attn_agg
         self.attn_cpt, self.ctx_cpt = self.abs(reps)
         self.attn, self.ctx = self.agg(self.ctx_cpt)
 
@@ -67,6 +69,7 @@ class PoolingModuleAAN(PoolingModuleBase):
 ### Loss function ###
 
 # TODO consider moving to aan_attention.py
+# TOOD could weight with a beta value like b-VAE for more disentangelement
 class AANLoss(nn.Module):
     """Cross-entropy loss + an abstraction diversity penalty."""
 

@@ -77,7 +77,8 @@ class AttentionSelf(torch.nn.Module):
             attn_ = attn_.masked_fill(mask == 0, -1e9)
         # dropout method 1.
         # if self.dropout_rate is not None:
-        #     drop_mask = Variable(torch.ones(attn_.size())).to(self.device)
+        #     # TODO variables are depr https://pytorch.org/docs/stable/autograd.html#variable-deprecated
+        #     drop_mask = torch.autograd.Variable(torch.ones(attn_.size())).to(self.device)
         #     drop_mask = self.model_drop(drop_mask)
         #     attn_ = attn_.masked_fill(drop_mask == 0, -1e9)
 
