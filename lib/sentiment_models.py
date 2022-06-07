@@ -16,10 +16,7 @@ HIDDEN_DIM = 768
 HIDDEN_ACTIVATION = nn.ReLU
 NUM_CONCEPTS = 10
 BATCH_SIZE = 16
-DIVERSITY_PENALTY_BETA = 3
-
-# TODO move this into init of roberta classifier class
-
+DIVERSITY_PENALTY_BETA = 0.66
 
 def phi(text):
     return text
