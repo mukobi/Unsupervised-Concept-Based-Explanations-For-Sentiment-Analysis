@@ -123,7 +123,7 @@ class SentimentClassifierModel(nn.Module):
         self.classifier_module = nn.Sequential(
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM),
             HIDDEN_ACTIVATION(),
-            nn.Dropout(0.1),
+            nn.Dropout(0.1),  # TODO this is prob too high
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM))
 
     def forward(self, *args):
