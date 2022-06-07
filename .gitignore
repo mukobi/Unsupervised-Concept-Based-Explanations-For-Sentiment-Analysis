@@ -131,3 +131,6 @@ dmypy.json
 # PyTorch model binaries
 models/*
 !models/.keepdir
+
+# Precomputed keyword representations
+data/keywords_representations.npy

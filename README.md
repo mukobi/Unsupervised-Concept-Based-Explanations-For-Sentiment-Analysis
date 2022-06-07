@@ -32,3 +32,4 @@ Run [evaluate_trained_models.ipynb](./evaluate_trained_models.ipynb) to evaluate
   - [torch_shallow_neural_classifier.py](./torch_shallow_neural_classifier.py)
   - [utils.py](./utils.py)
 - https://github.com/cgpotts/dynasent for DynaSent models and data
+- https://github.com/dolph/dictionary for a list of 25k English words used as concept keywords

@@ -15,14 +15,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 HIDDEN_DIM = 768
 HIDDEN_ACTIVATION = nn.ReLU
 NUM_CONCEPTS = 10
+BATCH_SIZE = 16
 
 # TODO move this into init of roberta classifier class
-roberta_config = AutoConfig.from_pretrained(
-    "roberta-base", output_hidden_states=True, num_labels=3, finetuning_task="sst3"
-)
-roberta_tokenizer = AutoTokenizer.from_pretrained(
-    "roberta-base", truncation=True, max_length=128, padding="max_length"
-)
 
 
 def phi(text):
@@ -59,17 +54,16 @@ class PoolingModuleAAN(PoolingModuleBase):
 
     def forward(self, reps):
         """Uses a concept-based abstraction-aggregation network over all transformer output reps."""
-        # TODO rename these to attn_abs, attn_agg
-        self.attn_cpt, self.ctx_cpt = self.abs(reps)
-        self.attn, self.ctx = self.agg(self.ctx_cpt)
+        self.attn_abs, self.ctx_abs = self.abs(reps)  # Abstraction
+        self.attn_agg, self.ctx_agg = self.agg(self.ctx_abs)  # Aggregation
 
-        return self.ctx
+        return self.ctx_agg
 
 
 ### Loss function ###
 
 # TODO consider moving to aan_attention.py
-# TOOD could weight with a beta value like b-VAE for more disentangelement
+# TODO could weight with a beta value like b-VAE for more disentangelement
 class AANLoss(nn.Module):
     """Cross-entropy loss + an abstraction diversity penalty."""
 
@@ -81,10 +75,10 @@ class AANLoss(nn.Module):
 
     def forward(self, batch_preds, y_batch):
         # Read the concept attention weights from the last batch
-        attn_cpt = self.pooling_module_aan.attn_cpt
+        attn_abs = self.pooling_module_aan.attn_abs
 
-        batch_size = attn_cpt.size(0)
-        cpt_cross = torch.bmm(attn_cpt, attn_cpt.transpose(1, 2))
+        batch_size = attn_abs.size(0)
+        cpt_cross = torch.bmm(attn_abs, attn_abs.transpose(1, 2))
         diag = torch.eye(
             cpt_cross.size(1), cpt_cross.size(2)
         ).to(device)
@@ -99,8 +93,8 @@ class AANLoss(nn.Module):
 ### build_dataset function definitions ###
 
 
-def _build_dataset_roberta(self, X, y):
-    data = roberta_tokenizer.batch_encode_plus(
+def _build_dataset_roberta(self, X, y, tokenizer):
+    data = tokenizer.batch_encode_plus(
         X,
         max_length=None,
         add_special_tokens=True,
@@ -119,8 +113,6 @@ def _build_dataset_roberta(self, X, y):
         y = torch.tensor(y)
         dataset = torch.utils.data.TensorDataset(indices, mask, y)
     return dataset
-
-
 
 
 ### Modular sentiment classifier module definition ###
@@ -188,14 +180,21 @@ class SentimentClassifierAANBase(SentimentClassifierBase):
 
 
 class SentimentClassifierRoberta(SentimentClassifierBase):
+    def __init__(self, *args, **kwargs):
+        self.roberta_config = AutoConfig.from_pretrained(
+            "roberta-base", output_hidden_states=True, num_labels=3, finetuning_task="sst3")
+        self.roberta_tokenizer = AutoTokenizer.from_pretrained(
+            "roberta-base", truncation=True, max_length=128, padding="max_length")
+        super().__init__(*args, **kwargs)
+
     def __repr__(self):
         return "RoBERTa-Base (Baseline)"
 
     def build_dataset(self, X, y=None):
-        return _build_dataset_roberta(self, X, y)
+        return _build_dataset_roberta(self, X, y, self.roberta_tokenizer)
 
     def build_encoder_module(self):
-        return AutoModel.from_pretrained("roberta-base", config=roberta_config)
+        return AutoModel.from_pretrained("roberta-base", config=self.roberta_config)
 
     def build_pooling_module(self):
         return PoolingModuleTransformerCLS()
@@ -212,7 +211,7 @@ class SentimentClassifierDynasent(SentimentClassifierRoberta):
         return "DynaSent-M1 (Baseline)"
 
     def build_encoder_module(self):
-        return AutoModel.from_pretrained(os.path.join("models", "dynasent_model1.bin"), config=roberta_config)
+        return AutoModel.from_pretrained(os.path.join("models", "dynasent_model1.bin"), config=self.roberta_config)
 
 
 class SentimentClassifierDynasentAAN(SentimentClassifierAANBase, SentimentClassifierDynasent):
