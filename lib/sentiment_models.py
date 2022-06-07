@@ -79,13 +79,12 @@ class AANLoss(nn.Module):
 
         batch_size = attn_abs.size(0)
         cpt_cross = torch.bmm(attn_abs, attn_abs.transpose(1, 2))
-        diag = torch.eye(
-            cpt_cross.size(1), cpt_cross.size(2)
-        ).to(device)
+        diag = torch.eye(cpt_cross.size(1), cpt_cross.size(2)).to(device)
         diag = diag.unsqueeze(0).repeat(batch_size, 1, 1)
         cpt_cross = cpt_cross - diag
 
-        diversity_penalty = torch.sqrt(torch.mean(cpt_cross*cpt_cross))
+        # diversity_penalty = torch.sqrt(torch.mean(cpt_cross*cpt_cross))  # From the repo
+        diversity_penalty = torch.div(torch.norm(cpt_cross, p='fro'), NUM_CONCEPTS)  # Mine
 
         return self.cross_entropy(batch_preds, y_batch) + diversity_penalty
 

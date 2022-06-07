@@ -349,6 +349,8 @@ class TorchModelBase:
         training_start_time = time.time()
         last_epoch_error = 0
 
+        self.training_errors = []  # Keep track of the error each epoch
+
         for iteration in range(1, self.max_iter+1):
             epoch_start_time = time.time()
 
@@ -372,6 +374,7 @@ class TorchModelBase:
                 err.backward()
 
                 epoch_error += err.item()
+                self.training_errors.append(epoch_error)
 
                 if batch_num % self.gradient_accumulation_steps == 0 or \
                   batch_num == len(dataloader):
