@@ -374,7 +374,6 @@ class TorchModelBase:
                 err.backward()
 
                 epoch_error += err.item()
-                self.training_errors.append(epoch_error)
 
                 if batch_num % self.gradient_accumulation_steps == 0 or \
                   batch_num == len(dataloader):
@@ -400,6 +399,7 @@ class TorchModelBase:
                     utils.progress_bar(message, verbose=self.display_progress)
 
             last_epoch_error = epoch_error
+            self.training_errors.append(epoch_error)
 
             # Stopping criteria:
             if self.early_stopping:

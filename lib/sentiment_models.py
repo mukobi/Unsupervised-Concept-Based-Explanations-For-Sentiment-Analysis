@@ -16,6 +16,7 @@ HIDDEN_DIM = 768
 HIDDEN_ACTIVATION = nn.ReLU
 NUM_CONCEPTS = 10
 BATCH_SIZE = 16
+DIVERSITY_PENALTY_BETA = 3
 
 # TODO move this into init of roberta classifier class
 
@@ -62,8 +63,6 @@ class PoolingModuleAAN(PoolingModuleBase):
 
 ### Loss function ###
 
-# TODO consider moving to aan_attention.py
-# TODO could weight with a beta value like b-VAE for more disentangelement
 class AANLoss(nn.Module):
     """Cross-entropy loss + an abstraction diversity penalty."""
 
@@ -86,7 +85,8 @@ class AANLoss(nn.Module):
         # diversity_penalty = torch.sqrt(torch.mean(cpt_cross*cpt_cross))  # From the repo
         diversity_penalty = torch.div(torch.norm(cpt_cross, p='fro'), NUM_CONCEPTS)  # Mine
 
-        return self.cross_entropy(batch_preds, y_batch) + diversity_penalty
+        # Total loss = x_entropy + beta * diversity_penalty (as in beta-VAE)
+        return self.cross_entropy(batch_preds, y_batch) + torch.mul(diversity_penalty, DIVERSITY_PENALTY_BETA)
 
 
 ### build_dataset function definitions ###
