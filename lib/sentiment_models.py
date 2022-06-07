@@ -69,6 +69,8 @@ class AANLoss(nn.Module):
         self.pooling_module_aan = pooling_module_aan
         self.reduction = 'mean'
         self.cross_entropy = nn.CrossEntropyLoss(reduction=self.reduction)
+        self.debug_counter = 0
+        self.diversity_penalties = []
 
     def forward(self, batch_preds, y_batch):
         # Read the concept attention weights from the last batch
@@ -83,7 +85,11 @@ class AANLoss(nn.Module):
         # diversity_penalty = torch.sqrt(torch.mean(cpt_cross*cpt_cross))  # From the repo
         diversity_penalty = torch.div(torch.norm(cpt_cross, p='fro'), NUM_CONCEPTS)  # Ours
 
-        print(diversity_penalty)
+        # store diversity penalties every 100 batches for later visualization
+        self.debug_counter += 1
+        if self.debug_counter % 100 == 0:
+            penalty_float = diversity_penalty.item()
+            self.diversity_penalties.append(penalty_float)
 
         # Total loss = x_entropy + beta * diversity_penalty (as in beta-VAE)
         return torch.add(self.cross_entropy(batch_preds, y_batch), torch.mul(diversity_penalty, DIVERSITY_PENALTY_BETA))

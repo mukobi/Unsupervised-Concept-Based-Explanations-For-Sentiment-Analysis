@@ -404,7 +404,7 @@ class TorchModelBase:
             # Stopping criteria:
             if self.early_stopping:
                 self._update_no_improvement_count_early_stopping(*dev)
-                # TODO undo: commenting out early stopping effects to keep validation scores
+                # NOTE undo: commenting out early stopping effects to keep validation scores
                 # if self.no_improvement_count > self.n_iter_no_change:
                 #     utils.progress_bar(
                 #         "Stopping after epoch {}. Validation score did "
@@ -429,7 +429,7 @@ class TorchModelBase:
                     iteration, self.max_iter, epoch_error),
                 verbose=self.display_progress)
 
-        # TODO undo: commenting out early stopping effects to keep validation scores
+        # NOTE undo: commenting out early stopping effects to keep validation scores
         # if self.early_stopping:
         #     self.model.load_state_dict(self.best_parameters)
 
@@ -535,7 +535,7 @@ class TorchModelBase:
         # If the current score is numerically better than all previous
         # scores, update the best parameters:
         if score > self.best_score:
-            # TODO undo: commenting out early stopping effects to keep validation scores
+            # NOTE undo: commenting out early stopping effects to keep validation scores
             # self.best_parameters = copy.deepcopy(self.model.state_dict())
             self.best_score = score
         self.model.train()
