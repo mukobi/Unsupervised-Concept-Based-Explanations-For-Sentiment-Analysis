@@ -18,6 +18,7 @@ NUM_CONCEPTS = 10
 BATCH_SIZE = 16
 DIVERSITY_PENALTY_BETA = 1
 
+
 def phi(text):
     return text
 
@@ -82,6 +83,8 @@ class AANLoss(nn.Module):
         # diversity_penalty = torch.sqrt(torch.mean(cpt_cross*cpt_cross))  # From the repo
         diversity_penalty = torch.div(torch.norm(cpt_cross, p='fro'), NUM_CONCEPTS)  # Ours
 
+        print(diversity_penalty)
+
         # Total loss = x_entropy + beta * diversity_penalty (as in beta-VAE)
         return torch.add(self.cross_entropy(batch_preds, y_batch), torch.mul(diversity_penalty, DIVERSITY_PENALTY_BETA))
 
@@ -123,7 +126,8 @@ class SentimentClassifierModel(nn.Module):
         self.classifier_module = nn.Sequential(
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM),
             HIDDEN_ACTIVATION(),
-            nn.Dropout(0.01),  # TODO this is prob too high
+            # Note this might be too high and hurt performance
+            nn.Dropout(0.1),
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM))
 
     def forward(self, *args):

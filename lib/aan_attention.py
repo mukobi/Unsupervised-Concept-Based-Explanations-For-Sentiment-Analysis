@@ -50,11 +50,10 @@ class AttentionConcepts(torch.nn.Module):
 
 
 class AttentionSelf(torch.nn.Module):
-    def __init__(
-        self, input_size, hidden_size, dropout_rate=None
-    ):
+    def __init__(self, input_size, hidden_size, dropout_rate=None):
         """
         Single-headed self-attention: aggregation attention (agg).
+        https://github.com/tshi04/ACCE/blob/master/LeafNATS/modules/attention/attention_self.py
         """
         super().__init__()
         self.dropout_rate = dropout_rate
@@ -77,7 +76,6 @@ class AttentionSelf(torch.nn.Module):
             attn_ = attn_.masked_fill(mask == 0, -1e9)
         # dropout method 1.
         if self.dropout_rate is not None:
-            # TODO variables are depr https://pytorch.org/docs/stable/autograd.html#variable-deprecated
             drop_mask = torch.ones(attn_.size()).to(input_.device)
             drop_mask = self.model_drop(drop_mask)
             attn_ = attn_.masked_fill(drop_mask == 0, -1e9)
