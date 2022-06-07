@@ -25,7 +25,6 @@ class AttentionConcepts(torch.nn.Module):
             attn_weights: attention weights
             attn_ctx_vec: context vector
         """
-        input_ = input_.last_hidden_state
         batch_size = input_.size(0)
 
         attn_weight = []

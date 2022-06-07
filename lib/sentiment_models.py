@@ -37,7 +37,7 @@ class PoolingModuleBase(nn.Module):
 
 
 class PoolingModuleTransformerCLS(PoolingModuleBase):
-    def forward(self, reps):
+    def forward(self, reps, attn_mask):
         """Takes the last-layer CLS rep as the pooled output."""
         return reps.last_hidden_state[:, 0, :]
 
@@ -51,9 +51,10 @@ class PoolingModuleAAN(PoolingModuleBase):
         self.agg = AttentionSelf(
             input_size=HIDDEN_DIM, hidden_size=HIDDEN_DIM, dropout_rate=0.02).to(device)
 
-    def forward(self, reps):
+    def forward(self, reps, attn_mask):
         """Uses a concept-based abstraction-aggregation network over all transformer output reps."""
-        self.attn_abs, self.ctx_abs = self.abs(reps)  # Abstraction
+        hidden_states = reps.last_hidden_state
+        self.attn_abs, self.ctx_abs = self.abs(hidden_states, attn_mask)  # Abstraction
         self.attn_agg, self.ctx_agg = self.agg(self.ctx_abs)  # Aggregation
 
         return self.ctx_agg
@@ -136,9 +137,9 @@ class SentimentClassifierModel(nn.Module):
             nn.Dropout(0.1),
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM))
 
-    def forward(self, *args):
-        reps = self.encoder_module(*args)
-        pooled = self.pooling_module(reps)
+    def forward(self, tokens, attn_mask):
+        reps = self.encoder_module(tokens, attn_mask)
+        pooled = self.pooling_module(reps, attn_mask)
         return self.classifier_module(pooled)
 
 
