@@ -16,7 +16,7 @@ HIDDEN_DIM = 768
 HIDDEN_ACTIVATION = nn.ReLU
 NUM_CONCEPTS = 10
 BATCH_SIZE = 16
-DIVERSITY_PENALTY_BETA = 0.66
+DIVERSITY_PENALTY_BETA = 1
 
 def phi(text):
     return text
@@ -123,7 +123,7 @@ class SentimentClassifierModel(nn.Module):
         self.classifier_module = nn.Sequential(
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM),
             HIDDEN_ACTIVATION(),
-            nn.Dropout(0.1),  # TODO this is prob too high
+            nn.Dropout(0.01),  # TODO this is prob too high
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM))
 
     def forward(self, *args):

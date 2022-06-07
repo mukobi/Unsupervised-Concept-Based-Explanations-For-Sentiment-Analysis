@@ -404,14 +404,15 @@ class TorchModelBase:
             # Stopping criteria:
             if self.early_stopping:
                 self._update_no_improvement_count_early_stopping(*dev)
-                if self.no_improvement_count > self.n_iter_no_change:
-                    utils.progress_bar(
-                        "Stopping after epoch {}. Validation score did "
-                        "not improve by tol={} for more than {} epochs. "
-                        "Final error is {}".format(iteration, self.tol,
-                            self.n_iter_no_change, epoch_error),
-                        verbose=self.display_progress)
-                    break
+                # TODO undo: commenting out early stopping effects to keep validation scores
+                # if self.no_improvement_count > self.n_iter_no_change:
+                #     utils.progress_bar(
+                #         "Stopping after epoch {}. Validation score did "
+                #         "not improve by tol={} for more than {} epochs. "
+                #         "Final error is {}".format(iteration, self.tol,
+                #             self.n_iter_no_change, epoch_error),
+                #         verbose=self.display_progress)
+                #     break
 
             else:
                 self._update_no_improvement_count_errors(epoch_error)
@@ -428,8 +429,9 @@ class TorchModelBase:
                     iteration, self.max_iter, epoch_error),
                 verbose=self.display_progress)
 
-        if self.early_stopping:
-            self.model.load_state_dict(self.best_parameters)
+        # TODO undo: commenting out early stopping effects to keep validation scores
+        # if self.early_stopping:
+        #     self.model.load_state_dict(self.best_parameters)
 
         return self
 
@@ -533,7 +535,8 @@ class TorchModelBase:
         # If the current score is numerically better than all previous
         # scores, update the best parameters:
         if score > self.best_score:
-            self.best_parameters = copy.deepcopy(self.model.state_dict())
+            # TODO undo: commenting out early stopping effects to keep validation scores
+            # self.best_parameters = copy.deepcopy(self.model.state_dict())
             self.best_score = score
         self.model.train()
 
