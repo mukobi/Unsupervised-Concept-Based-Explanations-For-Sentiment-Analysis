@@ -80,10 +80,10 @@ class AANLoss(nn.Module):
         cpt_cross = cpt_cross - diag
 
         # diversity_penalty = torch.sqrt(torch.mean(cpt_cross*cpt_cross))  # From the repo
-        diversity_penalty = torch.div(torch.norm(cpt_cross, p='fro'), NUM_CONCEPTS)  # Mine
+        diversity_penalty = torch.div(torch.norm(cpt_cross, p='fro'), NUM_CONCEPTS)  # Ours
 
         # Total loss = x_entropy + beta * diversity_penalty (as in beta-VAE)
-        return self.cross_entropy(batch_preds, y_batch) + torch.mul(diversity_penalty, DIVERSITY_PENALTY_BETA)
+        return torch.add(self.cross_entropy(batch_preds, y_batch), torch.mul(diversity_penalty, DIVERSITY_PENALTY_BETA))
 
 
 ### build_dataset function definitions ###
