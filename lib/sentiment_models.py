@@ -48,7 +48,7 @@ class PoolingModuleAAN(PoolingModuleBase):
         self.abs = AttentionConcepts(
             input_size=HIDDEN_DIM, n_concepts=self.n_concepts).to(device)
         self.agg = AttentionSelf(
-            input_size=HIDDEN_DIM, hidden_size=HIDDEN_DIM).to(device)
+            input_size=HIDDEN_DIM, hidden_size=HIDDEN_DIM, dropout_rate=0.02).to(device)
 
     def forward(self, reps):
         """Uses a concept-based abstraction-aggregation network over all transformer output reps."""
@@ -123,6 +123,7 @@ class SentimentClassifierModel(nn.Module):
         self.classifier_module = nn.Sequential(
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM),
             HIDDEN_ACTIVATION(),
+            nn.Dropout(0.1),
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM))
 
     def forward(self, *args):
