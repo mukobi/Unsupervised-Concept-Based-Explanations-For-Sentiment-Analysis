@@ -1,7 +1,9 @@
 # Unsupervised-Concept-Based-Explanations-For-Sentiment-Analysis
 Learning Unsupervised Concept-Based Explanations for Sentiment Analysis - Stanford CS 224U final project.
 
-We build baseline and abstraction-aggregation network (AAN) versions of transformer classifiers and fine-tune them for sentiment classification. We compare their qualitative classification performance and find introducing the penalties on the interpretable AAN models does not meaningfully impact performance. Despite this, the AAN models are able to produce useful concept-based explanations for their classifications, and we can use this to transparently discover errors and biases in the model (?).
+> This work aims to address the problem of concept-based explainability in natural language understanding tasks. Concept-based interpretability methods are important to helping users understand model predictions in human-level intuitive concepts. While prior works in concept-based explainabilty have largely focused on the vision domain, we explore challenges in adapting such methods to natural langauge by building from recent works (Shi et al., 2020) in this area and applying concept-based explainability methods to a sentiment classification task. We compare the concept-based interpretable methods to black-box model predictions and find that performance on the task is comparable, however the coherency of discovered concepts in the interpretable model suffers from lack of coherency.
+
+See [the full paper report here](./Unsupervised%20Concept%20Learning%20for%20Sentiment%20Analysis.pdf) for an in-depth evaluation and analysis of this approach.
 
 ## 1. Setup
 
