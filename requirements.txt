@@ -28,7 +28,7 @@
 
 torch==1.13.1
 torchvision==0.11.1
-transformers==4.17.0
+transformers==4.30.0
 datasets==2.0.0
 spacy
 gitpython
